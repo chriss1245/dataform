@@ -1,0 +1,23 @@
+CREATE OR REPLACE MODEL `${dataform.projectConfig.defaultSchema}.${constants.MODEL}_experiment`
+OPTIONS
+  (model_type = 'LINEAR_REG'
+
+  ) AS
+SELECT
+   Capacity,
+   AreaCode,
+   AverageTicketsPastDay,
+   AverageTicketsPastWeek,
+   AverageTicketsPerDayHour,
+   AverageTicketsPerHour,
+   STDTicketsPerDayHour,
+   is_mon,
+   is_tue,
+   is_wed,
+   is_thu,
+   is_fri,
+   is_sat,
+   EXTRACT(HOUR from TimeStart1H) as Hour,
+   AvailableSpots as label
+FROM
+   ${ref("datamart_train")}

@@ -1,0 +1,106 @@
+config {
+  type: "table",
+  description: "This table contains the metrics of evaluation of the model.",
+  columns: {
+    mean_absolute_error: "Mean absolute error.",
+    mean_squared_error: "Mean squared error.",
+    median_absolute_error: "Median of the absolute error.",
+    r2_score: "Coefficient of determination."
+   },
+  dependencies: ["experiment", "datamart_train", "datamart_validation", "datamart_test"]
+}
+
+WITH training_results AS (
+  SELECT
+    mean_absolute_error,
+    mean_squared_error,
+    median_absolute_error,
+    r2_score,
+    "train" as phase
+  FROM
+  ML.EVALUATE(MODEL `${dataform.projectConfig.defaultSchema}.${constants.MODEL}_experiment`,
+  (SELECT
+    Capacity,
+    AreaCode,
+    AverageTicketsPastDay,
+    AverageTicketsPastWeek,
+    AverageTicketsPerDayHour,
+    AverageTicketsPerHour,
+    STDTicketsPerDayHour,
+    is_mon,
+    is_tue,
+    is_wed,
+    is_thu,
+    is_fri,
+    is_sat,
+    EXTRACT(HOUR from TimeStart1H) as Hour,
+    AvailableSpots as label
+    FROM
+     ${ref('datamart_train')}
+    )
+  )
+), testing_results AS (
+  SELECT
+    mean_absolute_error,
+    mean_squared_error,
+    median_absolute_error,
+    r2_score,
+    "test" AS Phase
+  FROM
+  ML.EVALUATE(MODEL `${dataform.projectConfig.defaultSchema}.${constants.MODEL}_experiment`,
+  (SELECT
+    Capacity,
+    AreaCode,
+    AverageTicketsPastDay,
+    AverageTicketsPastWeek,
+    AverageTicketsPerDayHour,
+    AverageTicketsPerHour,
+    STDTicketsPerDayHour,
+    is_mon,
+    is_tue,
+    is_wed,
+    is_thu,
+    is_fri,
+    is_sat,
+    EXTRACT(HOUR from TimeStart1H) as Hour,
+    AvailableSpots as label
+    FROM
+     ${ref("datamart_validation")}
+    )
+  )
+), validation_results AS (
+  SELECT
+    mean_absolute_error,
+    mean_squared_error,
+    median_absolute_error,
+    r2_score,
+    "validation" AS Phase
+  FROM
+  ML.EVALUATE(MODEL `${dataform.projectConfig.defaultSchema}.${constants.MODEL}_experiment`,
+  (SELECT
+    Capacity,
+    AreaCode,
+    AverageTicketsPastDay,
+    AverageTicketsPastWeek,
+    AverageTicketsPerDayHour,
+    AverageTicketsPerHour,
+    STDTicketsPerDayHour,
+    is_mon,
+    is_tue,
+    is_wed,
+    is_thu,
+    is_fri,
+    is_sat,
+    EXTRACT(HOUR from TimeStart1H) as Hour,
+    AvailableSpots as label
+    FROM
+      ${ref("datamart_validation")}
+    )
+  )
+)
+
+SELECT * FROM training_results
+UNION ALL
+SELECT * FROM testing_results
+UNION ALL
+SELECT * FROM validation_results

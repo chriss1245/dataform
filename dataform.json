@@ -1,8 +1,12 @@
 {
   "defaultSchema": "parkunloadML",
-  "assertionSchema": "dataform_assertions",
+  "assertionSchema": "parkunloadML",
   "warehouse": "bigquery",
   "defaultDatabase": "bigquery-test-411411",
-  "defaultLocation": "europe-southwest1"
+  "defaultLocation": "europe-southwest1",
+  "vars": {
+    "source_schema": "parkunload",
+    "model": "model_availability_linear"
+  }
 }
     
