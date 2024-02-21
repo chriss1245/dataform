@@ -1,0 +1,28 @@
+
+config {
+  type: "table",
+    description: "This table contains data regarding de dum zones and only cities corresponding to VIC and PAL.",
+  columns: {
+    AreaCode: "The identifier of a parking zone with city_code-number_with_0_padding.",
+    CityCode: "The identifier of a city composed by 3 letters. It is used as part of AreaCode.",
+    Capacity: "The total available spots in a zone DUM.",
+    Type: "Zone type.",
+    IsDemo: "Indicator whether the area code is in demo."
+  },
+    assertions: {
+     nonNull: ["AreaCode", "CityCode", "Capacity", "Type", "IsDemo"]
+  }
+}
+
+SELECT AreaCode, CityCode, Capacity, Type, IsDemo
+FROM `parkunload.zones` zones
+WHERE
+zones.AreaCode IN (
+  SELECT DISTINCT AreaCode 
+  FROM parkunload.tickets
+) -- filter area codes with at least a ticket asociated
+AND (LOWER(zones.Type) LIKE '%dum%' -- filter dum zones
+  OR LOWER(zones.Type) LIKE '%carga%'
+  OR LOWER(zones.Type) LIKE '%c/d%')
+AND zones.IsDemo=FALSE -- filter out demo zones
+AND LOWER(zones.Language) LIKE '%es%' -- filter out non spanish zones

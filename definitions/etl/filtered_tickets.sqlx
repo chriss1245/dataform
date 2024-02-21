@@ -1,0 +1,26 @@
+
+config {
+  type: "table",
+    description: "This table contains the history of reservations made by the drivers over dum zones.",
+  columns: {
+    AreaCpde: "The identifier of a parking zone with city_code-number_with_0_padding.",
+    TimeStart: "The datetime in which the reservation starts.",
+    TimeFinish: "The datetime in which the ticket was closed.",
+    TimeLimit: "The datetime limit of the ticket."
+  },
+    assertions: {
+     nonNull: ["AreaCode", "TimeStart", "TimeFinish", "TimeLimit"]
+  }
+}
+
+SELECT
+  AreaCode,
+  TimeStart,
+  TimeFinish,
+  TimeLimit
+FROM parkunload.tickets
+WHERE 
+TimeStart IS NOT NULL AND
+TimeFinish IS NOT NULL AND
+TimeLimit IS NOT NULL AND
+AreaCode IN (SELECT AreaCode FROM ${ref("filtered_zones")})
