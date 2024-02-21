@@ -1,0 +1,48 @@
+
+config {
+  type: "table",
+  description: "This table contains the tickets created and the available slots per hour.",
+  columns: {
+    AreaCpde: "The identifier of a parking zone with city_code-number_with_0_padding.",
+    NTickets: "The number of tickets generated during the given hour",
+    TimeStart1H: "The datetime of the data.",
+    Capacity: "The number of parking slots maximun that the area has.",
+    CityCode: "The code identifying the city the zone belongs to.",
+    AvailableSpots: "The number of available parking spots. Computed as the max(diff Capacity - NTickets, 0)."
+  }
+}
+
+WITH
+  tickets_hours AS (
+  SELECT
+    AreaCode,
+    TIMESTAMP_TRUNC(TimeStart, HOUR) AS TimeStart1H
+  FROM
+    ${ref("filtered_tickets")}),
+
+  tickets_count AS (
+  SELECT
+    AreaCode,
+    TimeStart1H,
+    COUNT(TimeStart1H) AS NTickets,
+  FROM
+    tickets_hours
+  GROUP BY
+    AreaCode,
+    TimeStart1H
+)
+
+SELECT
+  tick.AreaCode,
+  tick.NTickets,
+  tick.TimeStart1H,
+  zon.Capacity,
+  zon.CityCode,
+  GREATEST(0, SAFE_SUBTRACT(zon.Capacity, tick.NTickets)) as AvailableSpots,
+
+FROM
+  tickets_count tick
+INNER JOIN
+  ${ref("filtered_zones")} zon
+ON
+  tick.AreaCode=zon.AreaCode
