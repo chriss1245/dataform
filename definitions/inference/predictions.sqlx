@@ -1,0 +1,13 @@
+
+config {
+  type: "table",
+  description: "This view contains the datatamart used for testing",
+  columns: {
+    AreaCode: "The identifier of a parking zone with city_code-number_with_0_padding, representing the specific parking area.",
+    NTickets: "The number of tickets generated during the given hour, indicating parking demand."
+  },
+  dependencies: ["training"]
+}
+
+
+SELECT 1 as dummy
