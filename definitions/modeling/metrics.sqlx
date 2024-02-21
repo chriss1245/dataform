@@ -65,7 +65,7 @@ WITH training_results AS (
     EXTRACT(HOUR from TimeStart1H) as Hour,
     AvailableSpots as label
     FROM
-     ${ref("datamart_validation")}
+     ${ref("datamart_test")}
     )
   )
 ), validation_results AS (
