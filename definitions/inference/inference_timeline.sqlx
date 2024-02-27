@@ -1,0 +1,64 @@
+/*
+This module creates an inference timeline with the hours and days allowed for the available zones DUM.
+The predictios are made from these zones. We expect to have one prediction per record in the schedules table.
+
+days: Computes the datetimes for the next 7 days
+days_weekdays: Computes the weekday for each of the 7 days
+area_days: creates a days_weekdays table for each of the AreaCodes to predict
+
+the final query will conserve only the weekdays and area codes registered in the schedule
+Also it will adjust StartTime1H to take into account the register hours.
+*/
+
+config {
+  type: "view",
+    description: "Timeline for future predictions",
+  columns: {
+    AreaCpde: "The identifier of a parking zone with city_code-number_with_0_padding.",
+    TimeStart1H: "The datetime in which the reservation starts truncated to hours.",
+    WeekDay: "The day of the week in bigquery format (1 (Sun) - 7 (Sat)).",
+    Hour: "The hour."
+  },
+  dependencies: ["training"]
+}
+
+
+WITH
+--generate the future 7 days datetimes
+days AS (
+  SELECT
+    DATETIME_ADD(DATETIME_TRUNC(CURRENT_DATETIME(), DAY), INTERVAL FutureLags DAY) AS StartDatetime
+  FROM UNNEST(GENERATE_ARRAY(0,6)) AS FutureLags
+),
+--generate the day of the week
+weekdays AS (
+  SELECT
+    StartDatetime,
+    EXTRACT(DAYOFWEEK FROM StartDatetime) as WeekDay
+  FROM days
+),
+--get the area codes
+area_codes AS (SELECT DISTINCT AreaCode FROM `${schema()}.schedules`),
+--generate all the weekdays per area code
+area_weekdays AS (
+  SELECT 
+    s.AreaCode, 
+    d.WeekDay,
+    d.StartDatetime
+  FROM weekdays d
+  CROSS JOIN area_codes s 
+),
+-- filter out the weekdays and hours not included in schedules
+timeline AS (
+  SELECT ad.AreaCode,ad.WeekDay, ad.StartDatetime, s.Hour
+  FROM area_weekdays ad
+  INNER JOIN `${schema()}.schedules` s ON ad.AreaCode = s.AreaCode AND ad.WeekDay = s.WeekDay -- conserve only the area code and weekdays included in schedules
+)
+
+-- generate the TimeStart1H by adding the hour and StartDatetime
+SELECT
+  AreaCode, 
+  DATE_ADD(StartDatetime, INTERVAL Hour HOUR) AS TimeStart1H,
+  WeekDay,
+  Hour
+FROM timeline
