@@ -7,7 +7,7 @@ config {
     median_absolute_error: "Median of the absolute error.",
     r2_score: "Coefficient of determination."
    },
-  dependencies: ["experiment", "datamart_train", "datamart_validation", "datamart_test"]
+  dependencies: ["experiment"]
 }
 
 WITH training_results AS (
@@ -22,7 +22,6 @@ WITH training_results AS (
   (SELECT
     Capacity,
     AreaCode,
-    AverageTicketsPastDay,
     AverageTicketsPastWeek,
     AverageTicketsPerDayHour,
     AverageTicketsPerHour,
@@ -51,7 +50,6 @@ WITH training_results AS (
   (SELECT
     Capacity,
     AreaCode,
-    AverageTicketsPastDay,
     AverageTicketsPastWeek,
     AverageTicketsPerDayHour,
     AverageTicketsPerHour,
@@ -65,7 +63,7 @@ WITH training_results AS (
     EXTRACT(HOUR from TimeStart1H) as Hour,
     AvailableSpots as label
     FROM
-     ${ref("datamart_validation")}
+     ${ref("datamart_test")}
     )
   )
 ), validation_results AS (
@@ -80,7 +78,6 @@ WITH training_results AS (
   (SELECT
     Capacity,
     AreaCode,
-    AverageTicketsPastDay,
     AverageTicketsPastWeek,
     AverageTicketsPerDayHour,
     AverageTicketsPerHour,

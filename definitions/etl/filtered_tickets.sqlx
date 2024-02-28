@@ -23,4 +23,5 @@ WHERE
 TimeStart IS NOT NULL AND
 TimeFinish IS NOT NULL AND
 TimeLimit IS NOT NULL AND
-AreaCode IN (SELECT AreaCode FROM ${ref("filtered_zones")})
+AreaCode IN (SELECT AreaCode FROM ${ref("filtered_zones")}) AND
+TimeStart >= CAST(DATE_SUB(CURRENT_DATE(), INTERVAL ${constants.TRAINING_START_MONTHS} MONTH) AS TIMESTAMP) -- minimun date to use
