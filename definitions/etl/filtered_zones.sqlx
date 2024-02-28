@@ -24,5 +24,8 @@ zones.AreaCode IN (
 AND (LOWER(zones.Type) LIKE '%dum%' -- filter dum zones
   OR LOWER(zones.Type) LIKE '%carga%'
   OR LOWER(zones.Type) LIKE '%c/d%')
-AND zones.IsDemo=FALSE -- filter out demo zones
+--AND zones.IsDemo=FALSE -- filter out demo zones
 AND LOWER(zones.Language) LIKE '%es%' -- filter out non spanish zones
+AND zones.CityCode IN ('PAL', 'VIC')
+
+
