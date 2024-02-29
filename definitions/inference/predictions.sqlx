@@ -4,6 +4,7 @@ This table queries the model to make predictions over the dataset.
 
 config {
   type: "table",
+  schema: dataform.projectConfig.vars.sourceSchema,
   description: "This table contains the datamart with the predicted values",
   columns: {
     AreaCode: "The identifier of a parking zone with city_code-number_with_0_padding, representing the specific parking area.",
