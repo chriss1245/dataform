@@ -1,0 +1,150 @@
+/*
+This table contains the datamart ready for the model. It 
+imputes the missing values based on the imputation_data table computed
+from the datamart.
+*/
+
+config {
+  type: "view",
+  description: "This view contains the data for training filtered",
+  columns: {
+    AreaCode: "The identifier of a parking zone with city_code-number_with_0_padding, representing the specific parking area.",
+    TimeStart1H: "The datetime of the data, truncated to the start of each hour, used for temporal analysis.",
+    Capacity: "The maximum number of parking slots that the area has, defining the potential supply.",
+    CityCode: "The code identifying the city the zone belongs to, used for geographical segmentation.",
+    AvailableSpots: "The number of available parking spots, computed as the maximum difference between Capacity and NTickets, ensuring a non-negative result.",
+    Hour: "Extracted hour from TimeStart1H, used for hourly trend analysis.",
+    WeekDay: "Extracted day of the week from TimeStart1H, indicating the weekday for further temporal segmentation.",
+    is_mon: "Boolean flag indicating whether the record corresponds to a Monday, useful for modeling weekly patterns.",
+    is_tue: "Boolean flag for Tuesday records.",
+    is_wed: "Boolean flag for Wednesday records.",
+    is_thu: "Boolean flag for Thursday records.",
+    is_fri: "Boolean flag for Friday records.",
+    is_sat: "Boolean flag for Saturday records.",
+    is_sun: "Boolean flag for Sunday records.",
+    AverageTicketsPastWeek: "Average tickets issued in the past week, offering insights into weekly demand fluctuations.",
+    AverageTicketsPastMonth: "Monthly average of tickets, illustrating long-term demand patterns.",
+    AverageTicketsPerHour: "Average number of tickets for each hour, across all days, highlighting hourly demand.",
+    STDTicketsPerHour: "Standard deviation of tickets per hour, measuring hourly demand variability.",
+    AverageTicketsPerDay: "Daily average ticket count, reflecting day-to-day demand trends.",
+    STDTicketsPerDay: "Standard deviation of daily tickets, indicating variability in daily demand.",
+    AverageTicketsPerDayHour: "Average ticket count per day and hour, providing detailed temporal demand insights.",
+    STDTicketsPerDayHour: "Standard deviation of tickets per day and hour, assessing variability in detailed temporal demand.",
+    MedTicketsPerDayHour: "Median of tickets per specific day and hour, offering a robust measure of central tendency for demand.",
+    MedTicketsPerDay: "Median ticket count per day, reflecting central demand trends on a daily basis.",
+    MedTicketsPerHour: "Median of tickets for each hour, highlighting central hourly demand trends."
+  }
+}
+
+WITH aux_inference AS (
+  SELECT t.AreaCode, NULL AS NTickets, CAST(t.TimeStart1H AS TIMESTAMP) as TimeStart1H, a.Capacity, a.CityCode, NULL as AvailableSpots
+  FROM `parkunloadML.inference_timeline` t
+  INNER JOIN ${ref('filtered_zones')} a ON t.AreaCode=a.AreaCode
+),
+area_codes AS (
+  SELECT DISTINCT AreaCode FROM ${ref('inference_timeline')}
+),
+demand AS (
+  SELECT d.AreaCode, d.NTickets, d.TimeStart1H as TimeStart1H, d.Capacity, d.CityCode, d.AvailableSpots
+  FROM `parkunloadML.demand` d
+  INNER JOIN area_codes ac ON d.AreaCode = ac.AreaCode
+  WHERE d.TimeStart1H > CAST(DATE_SUB(CURRENT_DATE(), INTERVAL 4 MONTH) AS TIMESTAMP)
+),
+concat_df AS (
+  SELECT * FROM aux_inference 
+  UNION ALL
+  SELECT * FROM demand
+),
+-- etl, if there is no registered parking, there may appear missing values
+raw_datamart AS (
+  SELECT
+  AreaCode,
+  NTickets,
+  TimeStart1H,
+  Capacity,
+  CityCode,
+  AvailableSpots,
+  EXTRACT(HOUR FROM TimeStart1H) as Hour,
+  EXTRACT(DAYOFWEEK FROM TimeStart1H) as WeekDay,
+  CASE WHEN EXTRACT(DAYOFWEEK FROM TimeStart1H) = 2 THEN 1 ELSE 0 END as is_mon,
+  CASE WHEN EXTRACT(DAYOFWEEK FROM TimeStart1H) = 3 THEN 1 ELSE 0 END as is_tue,
+  CASE WHEN EXTRACT(DAYOFWEEK FROM TimeStart1H) = 4 THEN 1 ELSE 0 END as is_wed,
+  CASE WHEN EXTRACT(DAYOFWEEK FROM TimeStart1H) = 5 THEN 1 ELSE 0 END as is_thu,
+  CASE WHEN EXTRACT(DAYOFWEEK FROM TimeStart1H) = 6 THEN 1 ELSE 0 END as is_fri,
+  CASE WHEN EXTRACT(DAYOFWEEK FROM TimeStart1H) = 7 THEN 1 ELSE 0 END as is_sat,
+  CASE WHEN EXTRACT(DAYOFWEEK FROM TimeStart1H) = 1 THEN 1 ELSE 0 END as is_sun,
+  UNIX_SECONDS(TimeStart1H) as Seconds,
+  AVG(NTickets) OVER (
+    PARTITION BY AreaCode
+    ORDER BY UNIX_SECONDS(TimeStart1H)
+    RANGE BETWEEN (604800) PRECEDING AND 0 PRECEDING -- one week ago
+  ) as AverageTicketsPastWeek,
+  AVG(NTickets) OVER (
+    PARTITION BY AreaCode
+    ORDER BY UNIX_SECONDS(TimeStart1H)
+    RANGE BETWEEN (2592000) PRECEDING AND 0 PRECEDING -- one month ago
+  ) as AverageTicketsPastMonth,
+  AVG(NTickets) OVER (
+    PARTITION BY AreaCode, EXTRACT(HOUR FROM TimeStart1H)
+  ) as AverageTicketsPerHour,
+  STDDEV(NTickets) OVER (
+    PARTITION BY AreaCode, EXTRACT(HOUR FROM TimeStart1H)
+  ) as STDTicketsPerHour,
+  AVG(NTickets) OVER (
+    PARTITION BY AreaCode, EXTRACT(DAYOFWEEK FROM TimeStart1H)
+  ) as AverageTicketsPerDay,
+  STDDEV(NTickets) OVER (
+    PARTITION BY AreaCode, EXTRACT(DAYOFWEEK FROM TimeStart1H)
+  ) as STDTicketsPerDay,
+  AVG(NTickets) OVER (
+    PARTITION BY AreaCode, EXTRACT(DAYOFWEEK FROM TimeStart1H), EXTRACT(HOUR FROM TimeStart1H)
+  ) as AverageTicketsPerDayHour,
+  STDDEV(NTickets) OVER (
+    PARTITION BY AreaCode, EXTRACT(DAYOFWEEK FROM TimeStart1H), EXTRACT(HOUR FROM TimeStart1H)
+  ) as STDTicketsPerDayHour,
+  PERCENTILE_CONT(NTickets, 0.5) OVER (
+    PARTITION BY AreaCode, EXTRACT(DAYOFWEEK FROM TimeStart1H), EXTRACT(HOUR FROM TimeStart1H)
+  ) as MedTicketsPerDayHour,
+  PERCENTILE_CONT(NTickets, 0.5) OVER (
+    PARTITION BY AreaCode, EXTRACT(DAYOFWEEK FROM TimeStart1H)
+  ) as MedTicketsPerDay,
+  PERCENTILE_CONT(NTickets, 0.5) OVER (
+    PARTITION BY AreaCode, EXTRACT(HOUR FROM TimeStart1H)
+  ) as MedTicketsPerHour,
+
+FROM
+    concat_df
+)
+--data imputed
+SELECT
+  s.AreaCode,
+  s.TimeStart1H,
+  s.Capacity,
+  s.CityCode,
+  s.AvailableSpots,
+  s.Hour,
+  s.WeekDay,
+  s.is_mon,
+  s.is_tue,
+  s.is_wed,
+  s.is_thu,
+  s.is_fri,
+  s.is_sat,
+  s.is_sun,
+  COALESCE(s.AverageTicketsPastWeek, i.AverageTicketsPastWeek) AS AverageTicketsPastWeek,
+  COALESCE(s.AverageTicketsPastMonth, i.AverageTicketsPastMonth) AS AverageTicketsPastMonth,
+  COALESCE(s.AverageTicketsPerHour, i.AverageTicketsPerHour) AS AverageTicketsPerHour,
+  COALESCE(s.STDTicketsPerHour, i.STDTicketsPerHour) AS STDTicketsPerHour,
+  COALESCE(s.AverageTicketsPerDay, i.AverageTicketsPerDay) AS AverageTicketsPerDay,
+  COALESCE(s.STDTicketsPerDay, i.STDTicketsPerDay) AS STDTicketsPerDay,
+  COALESCE(s.AverageTicketsPerDayHour, i.AverageTicketsPerDayHour) AS AverageTicketsPerDayHour,
+  COALESCE(s.STDTicketsPerDayHour, i.STDTicketsPerDayHour) AS STDTicketsPerDayHour,
+  COALESCE(s.MedTicketsPerDayHour, i.MedTicketsPerDayHour) AS MedTicketsPerDayHour,
+  COALESCE(s.MedTicketsPerDay, i.MedTicketsPerDay) AS MedTicketsPerDay,
+  COALESCE(s.MedTicketsPerHour, i.MedTicketsPerHour) AS MedTicketsPerHour
+
+FROM
+  raw_datamart s
+LEFT JOIN
+  ${ref('imputation_data')} i ON s.AreaCode = i.AreaCode AND s.WeekDay = i.WeekDay AND s.Hour = i.Hour
+

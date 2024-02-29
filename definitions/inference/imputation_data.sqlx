@@ -1,0 +1,58 @@
+/*
+This module computes data to impute missing values in the inference datamart. It takes advantage of
+the hard estacionallity of hours and weekdays. It
+*/
+
+config {
+  type: "table",
+  description: "This view contains the datatamart used for testing",
+  columns: {
+    AreaCode: "The identifier of a parking zone with city_code-number_with_0_padding, representing the specific parking area.",
+    TimeStart1H: "The datetime of the data, truncated to the start of each hour, used for temporal analysis.",
+    Hour: "Extracted hour from TimeStart1H, used for hourly trend analysis.",
+    WeekDay: "Extracted day of the week from TimeStart1H, indicating the weekday for further temporal segmentation.",
+    AverageTicketsPastWeek: "Average tickets issued in the past week, offering insights into weekly demand fluctuations.",
+    AverageTicketsPastMonth: "Monthly average of tickets, illustrating long-term demand patterns.",
+    AverageTicketsPerHour: "Average number of tickets for each hour, across all days, highlighting hourly demand.",
+    STDTicketsPerHour: "Standard deviation of tickets per hour, measuring hourly demand variability.",
+    AverageTicketsPerDay: "Daily average ticket count, reflecting day-to-day demand trends.",
+    STDTicketsPerDay: "Standard deviation of daily tickets, indicating variability in daily demand.",
+    AverageTicketsPerDayHour: "Average ticket count per day and hour, providing detailed temporal demand insights.",
+    STDTicketsPerDayHour: "Standard deviation of tickets per day and hour, assessing variability in detailed temporal demand.",
+    MedTicketsPerDayHour: "Median of tickets per specific day and hour, offering a robust measure of central tendency for demand.",
+    MedTicketsPerDay: "Median ticket count per day, reflecting central demand trends on a daily basis.",
+    MedTicketsPerHour: "Median of tickets for each hour, highlighting central hourly demand trends."
+  },
+}
+
+-- Number from the earliest to the oldest record per AreaCode, WeekDay and Hour
+WITH ranked_entries AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER(PARTITION BY AreaCode, WeekDay, Hour ORDER BY TimeStart1H DESC) AS rn
+  FROM
+    ${ref('datamart')}
+)
+
+-- Filter out only the earliest record. If a value from this record is missing, the earliest will fill it.
+SELECT
+  AreaCode,
+  TimeStart1H,
+  CityCode,
+  Hour,
+  WeekDay,
+  AverageTicketsPastWeek,
+  AverageTicketsPastMonth,
+  AverageTicketsPerHour,
+  STDTicketsPerHour,
+  AverageTicketsPerDay,
+  STDTicketsPerDay,
+  AverageTicketsPerDayHour,
+  STDTicketsPerDayHour,
+  MedTicketsPerDayHour,
+  MedTicketsPerDay,
+  MedTicketsPerHour
+FROM
+  ranked_entries
+WHERE
+  rn = 1
