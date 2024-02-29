@@ -114,6 +114,10 @@ raw_datamart AS (
 
 FROM
     concat_df
+),
+raw_datamart_filtered AS (
+  SELECT * FROM raw_datamart
+  WHERE TimeStart1H >= CURRENT_DATE()
 )
 --data imputed
 SELECT
@@ -144,7 +148,8 @@ SELECT
   COALESCE(s.MedTicketsPerHour, i.MedTicketsPerHour) AS MedTicketsPerHour
 
 FROM
-  raw_datamart s
+  raw_datamart_filtered s
 LEFT JOIN
   ${ref('imputation_data')} i ON s.AreaCode = i.AreaCode AND s.WeekDay = i.WeekDay AND s.Hour = i.Hour
+  
 
