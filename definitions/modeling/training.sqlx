@@ -1,3 +1,7 @@
+/*
+This module trains a bigquery model with features from the datamart.
+*/
+
 config {
       dependencies: ["datamart"]
 }
@@ -6,7 +10,6 @@ config {
 CREATE OR REPLACE MODEL `${dataform.projectConfig.defaultSchema}.${constants.MODEL}`
 OPTIONS
   (model_type = 'LINEAR_REG'
-
   ) AS
 SELECT
    Capacity,
