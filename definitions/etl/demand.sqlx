@@ -8,7 +8,7 @@ config {
     TimeStart1H: "The datetime of the data.",
     Capacity: "The number of parking slots maximun that the area has.",
     CityCode: "The code identifying the city the zone belongs to.",
-    AvailableSpots: "The number of available parking spots. Computed as the max(diff Capacity - NTickets, 0)."
+    AvailableSpots: "The number of available parking spots. Computed as the max(diff Capacity - NTickets, 0).",
   }
 }
 

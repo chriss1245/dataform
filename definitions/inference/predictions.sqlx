@@ -12,33 +12,39 @@ config {
     Capacity: "The maximum number of parking slots that the area has, defining the potential supply.",
     PredictedValue: "Extracted hour from TimeStart1H, used for hourly trend analysis.",
     AvailableSpots: "Parking spots available.",
+    Position: "Location in geo type"
   }
 }
 
-SELECT
-  AreaCode,
-  predicted_label as PredictedValue,
-  TimeStart1H,
-  Capacity,
-  LEAST(ROUND(GREATEST(predicted_label, 0), 0), Capacity) as AvailableSpots,
-FROM
-  ML.PREDICT(MODEL `${dataform.projectConfig.defaultSchema}.${constants.MODEL}`,
-    (SELECT
-      Capacity,
-      AreaCode,
-      TimeStart1H,
-      AverageTicketsPastWeek,
-      AverageTicketsPerDayHour,
-      AverageTicketsPerHour,
-      STDTicketsPerDayHour,
-      is_mon,
-      is_tue,
-      is_wed,
-      is_thu,
-      is_fri,
-      is_sat,
-      EXTRACT(HOUR from TimeStart1H) as Hour,
-      FROM
-        ${ref('datamart_inference')}
+WITH predictions AS (
+  SELECT
+    AreaCode,
+    predicted_label as PredictedValue,
+    TimeStart1H,
+    Capacity,
+    LEAST(ROUND(GREATEST(predicted_label, 0), 0), Capacity) as AvailableSpots,
+  FROM
+    ML.PREDICT(MODEL `${dataform.projectConfig.defaultSchema}.${constants.MODEL}`,
+      (SELECT
+        Capacity,
+        AreaCode,
+        TimeStart1H,
+        AverageTicketsPastWeek,
+        AverageTicketsPerDayHour,
+        AverageTicketsPerHour,
+        STDTicketsPerDayHour,
+        is_mon,
+        is_tue,
+        is_wed,
+        is_thu,
+        is_fri,
+        is_sat,
+        EXTRACT(HOUR from TimeStart1H) as Hour,
+        FROM
+          ${ref('datamart_inference')}
+      )
     )
-  )
+)
+
+SELECT p.*, a.Position FROM predictions  p
+LEFT JOIN ${ref('filtered_zones')} a ON p.AreaCode = a.AreaCode

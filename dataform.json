@@ -5,7 +5,9 @@
   "defaultDatabase": "bigquery-test-411411",
   "defaultLocation": "europe-southwest1",
   "vars": {
-    "sourceSchema": "parkunload"
+    "sourceSchema": "parkunload",
+    "sourceZonesTable": "zones",
+    "sourceTicketsTable": "tickets"
   }
 }
     

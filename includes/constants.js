@@ -3,7 +3,7 @@ This module contains user defined constants used in the project
 */
 
 // Data split
-const TRAINING_MONTHS = 12;
+const TRAINING_MONTHS = 15;
 const TESTING_MONTHS = 3;
 const VALIDATION_MONTHS = 3;
 // Compute the intervals to filter by.
