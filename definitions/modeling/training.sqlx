@@ -1,12 +1,16 @@
+/*
+This module trains a bigquery model with features from the datamart.
+*/
+
 config {
-      dependencies: ["datamart"]
+   dependencies: ["datamart"]
 }
 
 -- This module constains the query for training the production model
 CREATE OR REPLACE MODEL `${dataform.projectConfig.defaultSchema}.${constants.MODEL}`
 OPTIONS
-  (model_type = 'LINEAR_REG'
-
+  (
+   model_type = 'LINEAR_REG'
   ) AS
 SELECT
    Capacity,

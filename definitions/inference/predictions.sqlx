@@ -1,69 +1,50 @@
+/*
+This table queries the model to make predictions over the dataset.
+*/
 
 config {
   type: "table",
-  description: "This view contains the datatamart used for testing",
+  schema: dataform.projectConfig.vars.sourceSchema,
+  description: "This table contains the datamart with the predicted values",
   columns: {
     AreaCode: "The identifier of a parking zone with city_code-number_with_0_padding, representing the specific parking area.",
     TimeStart1H: "The datetime of the data, truncated to the start of each hour, used for temporal analysis.",
     Capacity: "The maximum number of parking slots that the area has, defining the potential supply.",
-    Hour: "Extracted hour from TimeStart1H, used for hourly trend analysis.",
-    WeekDay: "Extracted day of the week from TimeStart1H, indicating the weekday for further temporal segmentation.",
-    is_mon: "Boolean flag indicating whether the record corresponds to a Monday, useful for modeling weekly patterns.",
-    is_tue: "Boolean flag for Tuesday records.",
-    is_wed: "Boolean flag for Wednesday records.",
-    is_thu: "Boolean flag for Thursday records.",
-    is_fri: "Boolean flag for Friday records.",
-    is_sat: "Boolean flag for Saturday records.",
-    is_sun: "Boolean flag for Sunday records.",
-    AverageTicketsPastDay: "Average number of tickets in the past day, providing short-term demand trends.",
-    AverageTicketsPastWeek: "Average tickets issued in the past week, offering insights into weekly demand fluctuations.",
-    AverageTicketsPastMonth: "Monthly average of tickets, illustrating long-term demand patterns.",
-    AverageTicketsPerHour: "Average number of tickets for each hour, across all days, highlighting hourly demand.",
-    STDTicketsPerHour: "Standard deviation of tickets per hour, measuring hourly demand variability.",
-    AverageTicketsPerDay: "Daily average ticket count, reflecting day-to-day demand trends.",
-    STDTicketsPerDay: "Standard deviation of daily tickets, indicating variability in daily demand.",
-    AverageTicketsPerDayHour: "Average ticket count per day and hour, providing detailed temporal demand insights.",
-    STDTicketsPerDayHour: "Standard deviation of tickets per day and hour, assessing variability in detailed temporal demand.",
-    MedTicketsPerDayHour: "Median of tickets per specific day and hour, offering a robust measure of central tendency for demand.",
-    MedTicketsPerDay: "Median ticket count per day, reflecting central demand trends on a daily basis.",
-    MedTicketsPerHour: "Median of tickets for each hour, highlighting central hourly demand trends."
-  },
+    PredictedValue: "Extracted hour from TimeStart1H, used for hourly trend analysis.",
+    AvailableSpots: "Parking spots available.",
+    Position: "Location in geo type"
+  }
 }
 
-WITH
-  tickets_hours AS (
+WITH predictions AS (
   SELECT
     AreaCode,
-    TIMESTAMP_TRUNC(TimeStart, HOUR) AS TimeStart1H
-  FROM
-    ${ref("filtered_tickets")}
-  WHERE TimeStart >= CAST(DATE_SUB(CURRENT_DATE(), INTERVAL ${constants.INFERENCE_MONTHS_REQUIRED} MONTH) AS TIMESTAMP)
-  ),
-
-  tickets_count AS (
-  SELECT
-    AreaCode,
+    predicted_label as PredictedValue,
     TimeStart1H,
-    COUNT(TimeStart1H) AS NTickets,
+    Capacity,
+    LEAST(ROUND(GREATEST(predicted_label, 0), 0), Capacity) as AvailableSpots,
   FROM
-    tickets_hours
-  GROUP BY
-    AreaCode,
-    TimeStart1H
+    ML.PREDICT(MODEL `${dataform.projectConfig.defaultSchema}.${constants.MODEL}`,
+      (SELECT
+        Capacity,
+        AreaCode,
+        TimeStart1H,
+        AverageTicketsPastWeek,
+        AverageTicketsPerDayHour,
+        AverageTicketsPerHour,
+        STDTicketsPerDayHour,
+        is_mon,
+        is_tue,
+        is_wed,
+        is_thu,
+        is_fri,
+        is_sat,
+        EXTRACT(HOUR from TimeStart1H) as Hour,
+        FROM
+          ${ref('datamart_inference')}
+      )
+    )
 )
 
-SELECT
-  tick.AreaCode,
-  tick.NTickets,
-  tick.TimeStart1H,
-  zon.Capacity,
-  zon.CityCode,
-  GREATEST(0, SAFE_SUBTRACT(zon.Capacity, tick.NTickets)) as AvailableSpots,
-FROM
-  tickets_count tick
-INNER JOIN
-  ${ref("filtered_zones")} zon
-ON
-  tick.AreaCode=zon.AreaCode
-WHERE TimeStart1H >= CAST(DATE_SUB(CURRENT_DATE(), INTERVAL ${constants.INFERENCE_MONTHS_REQUIRED} MONTH) AS TIMESTAMP)
-
+SELECT p.*, a.Position FROM predictions  p
+LEFT JOIN ${ref('filtered_zones')} a ON p.AreaCode = a.AreaCode
