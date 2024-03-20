@@ -117,7 +117,7 @@ FROM
 ),
 raw_datamart_filtered AS (
   SELECT * FROM raw_datamart
-  WHERE TimeStart1H >= CURRENT_DATE()
+  WHERE TimeStart1H >= CURRENT_TIMESTAMP()
 )
 --data imputed
 SELECT
